@@ -1,5 +1,5 @@
 // src/screens/GroupDetailScreen.js
-import React, { useContext, useLayoutEffect, useState } from "react";
+import React, { useContext, useLayoutEffect } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Alert, RefreshControl } from "react-native";
 import { DataContext } from "../context/DataContext";
 import { AuthContext } from "../context/AuthContext";
@@ -7,7 +7,7 @@ import { Icon } from "react-native-paper";
 
 export default function GroupDetailScreen({ route, navigation }) {
   const { groupId } = route.params;
-  const { groups, calculateBalances, calculatePairwiseBalance, getUserName, deleteExpense, settleUp, refreshData, refreshing } = useContext(DataContext);
+  const { groups, calculateBalances, calculatePairwiseBalance, getUserName, deleteExpense, refreshData, refreshing } = useContext(DataContext);
   const { user } = useContext(AuthContext);
 
   const group = groups.find(g => g.id === groupId);
@@ -26,23 +26,6 @@ export default function GroupDetailScreen({ route, navigation }) {
       ),
     });
   }, [navigation, group]);
-
-  const handleSettleUp = (fromUserId, toUserId, amount) => {
-    Alert.alert(
-      "Settle Up",
-      `${getUserName(fromUserId)} will settle ₹${Math.abs(amount).toFixed(2)} with ${getUserName(toUserId)}`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm",
-          onPress: async () => {
-            await settleUp(groupId, fromUserId, toUserId, Math.abs(amount));
-            Alert.alert("Success", "Payment settled!");
-          },
-        },
-      ]
-    );
-  };
 
   const handleDeleteExpense = (expenseId, description) => {
     Alert.alert(
@@ -115,32 +98,142 @@ export default function GroupDetailScreen({ route, navigation }) {
     );
   };
 
-  const renderBalance = (memberId) => {
-    const isCurrentUser = memberId === user?.uid;
-    const name = getUserName(memberId);
-    
-    // Calculate pairwise balance between current user and this member
-    // Positive: member owes current user
-    // Negative: current user owes member
-    const netBalance = isCurrentUser 
-      ? balances[user?.uid] || 0  // For current user, show their overall balance
-      : calculatePairwiseBalance(groupId, user?.uid, memberId);
-    
-    if (netBalance === 0 && !isCurrentUser) return null;
+  // Calculate user's total spending in this group
+  const getUserTotalSpent = () => {
+    if (!group || !user?.uid) return 0;
+    return group.expenses
+      .filter(expense => expense.paidBy === user.uid)
+      .reduce((total, expense) => total + expense.amount, 0);
+  };
 
-    const balanceColor = netBalance > 0 ? "#10B981" : netBalance < 0 ? "#EF4444" : "#6B7280";
+  // Get people who owe the current user
+  const getPeopleWhoOweUser = () => {
+    if (!group || !user?.uid) return [];
+    const peopleWhoOwe = [];
+    
+    group.members.forEach(memberId => {
+      if (memberId === user.uid) return; // Skip self
+      
+      const netBalance = calculatePairwiseBalance(groupId, user.uid, memberId);
+      if (netBalance > 0) {
+        // Positive means member owes user
+        peopleWhoOwe.push({
+          memberId,
+          name: getUserName(memberId),
+          amount: netBalance,
+        });
+      }
+    });
+    
+    return peopleWhoOwe;
+  };
+
+  // Get people the current user owes
+  const getPeopleUserOwes = () => {
+    if (!group || !user?.uid) return [];
+    const peopleUserOwes = [];
+    
+    group.members.forEach(memberId => {
+      if (memberId === user.uid) return; // Skip self
+      
+      const netBalance = calculatePairwiseBalance(groupId, user.uid, memberId);
+      if (netBalance < 0) {
+        // Negative means user owes member
+        peopleUserOwes.push({
+          memberId,
+          name: getUserName(memberId),
+          amount: Math.abs(netBalance),
+        });
+      }
+    });
+    
+    return peopleUserOwes;
+  };
+
+  // Render user's summary section
+  const renderUserSummary = () => {
+    if (!user?.uid) return null;
+    
+    const totalSpent = getUserTotalSpent();
+    const peopleWhoOwe = getPeopleWhoOweUser();
+    const peopleUserOwes = getPeopleUserOwes();
+    const allSettled = peopleWhoOwe.length === 0 && peopleUserOwes.length === 0 && totalSpent === 0;
+
+    return (
+      <View style={styles.userSummarySection}>
+        <View style={styles.userSummaryHeader}>
+          <Icon source="account" size={20} color="#6366F1" />
+          <Text style={styles.userSummaryTitle}>Your Summary</Text>
+        </View>
+        
+        {totalSpent > 0 && (
+          <View style={styles.summaryStat}>
+            <Text style={styles.summaryLabel}>Total spent:</Text>
+            <Text style={styles.summaryAmount}>₹{totalSpent.toFixed(2)}</Text>
+          </View>
+        )}
+
+        {peopleWhoOwe.length > 0 && (
+          <View style={styles.owedSection}>
+            <Text style={styles.owedSectionTitle}>People who owe you:</Text>
+            {peopleWhoOwe.map(({ memberId, name, amount }) => (
+              <View key={memberId} style={styles.owedItem}>
+                <Icon source="arrow-down" size={16} color="#10B981" />
+                <Text style={styles.owedName}>{name}</Text>
+                <Text style={[styles.owedAmount, { color: "#10B981" }]}>
+                  ₹{amount.toFixed(2)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {peopleUserOwes.length > 0 && (
+          <View style={styles.owedSection}>
+            <Text style={styles.owedSectionTitle}>You owe:</Text>
+            {peopleUserOwes.map(({ memberId, name, amount }) => (
+              <View key={memberId} style={styles.owedItem}>
+                <Icon source="arrow-up" size={16} color="#EF4444" />
+                <Text style={styles.owedName}>{name}</Text>
+                <Text style={[styles.owedAmount, { color: "#EF4444" }]}>
+                  ₹{amount.toFixed(2)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {allSettled && (
+          <View style={styles.settledIndicator}>
+            <Icon source="check-circle" size={16} color="#10B981" />
+            <Text style={styles.settledIndicatorText}>All settled up!</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // Render balance for other members (not current user)
+  const renderOtherMemberBalance = (memberId) => {
+    if (memberId === user?.uid) return null; // Skip current user
+    
+    const name = getUserName(memberId);
+    const netBalance = calculatePairwiseBalance(groupId, user?.uid, memberId);
+    
+    // Only show if there's a balance
+    if (netBalance === 0) return null;
+
+    const balanceColor = netBalance > 0 ? "#10B981" : "#EF4444";
     const balanceText = netBalance > 0
       ? `owes you ₹${Math.abs(netBalance).toFixed(2)}`
-      : netBalance < 0
-      ? `you owe ₹${Math.abs(netBalance).toFixed(2)}`
-      : "settled up";
+      : `you owe ₹${Math.abs(netBalance).toFixed(2)}`;
 
     return (
       <View key={memberId} style={styles.balanceItem}>
         <View style={styles.balanceInfo}>
           <View style={styles.balanceNameRow}>
             <Icon 
-              source={netBalance > 0 ? "arrow-down" : netBalance < 0 ? "arrow-up" : "check-circle"} 
+              source={netBalance > 0 ? "arrow-down" : "arrow-up"} 
               size={20} 
               color={balanceColor} 
             />
@@ -150,29 +243,6 @@ export default function GroupDetailScreen({ route, navigation }) {
             {balanceText}
           </Text>
         </View>
-        {netBalance !== 0 && !isCurrentUser && (
-          <TouchableOpacity
-            style={[styles.settleButton, netBalance < 0 && styles.settleButtonActive]}
-            onPress={() => {
-              if (netBalance < 0) {
-                // User owes member, so user pays member
-                handleSettleUp(user?.uid, memberId, Math.abs(netBalance));
-              } else {
-                // Member owes user, so member pays user
-                handleSettleUp(memberId, user?.uid, Math.abs(netBalance));
-              }
-            }}
-          >
-            <Icon 
-              source={netBalance < 0 ? "check-circle" : "bell"} 
-              size={16} 
-              color={netBalance < 0 ? "#FFFFFF" : "#6B7280"} 
-            />
-            <Text style={[styles.settleButtonText, netBalance < 0 && { color: "#FFFFFF" }]}>
-              {netBalance < 0 ? "Settle Up" : "Request"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   };
@@ -195,15 +265,25 @@ export default function GroupDetailScreen({ route, navigation }) {
             <Icon source="account-balance-wallet" size={24} color="#6366F1" />
             <Text style={styles.sectionTitle}>Balances</Text>
           </View>
-          <TouchableOpacity
-            style={styles.addMemberButton}
-            onPress={() => navigation.navigate("AddMember", { groupId })}
-          >
-            <Icon source="account-plus" size={18} color="#6366F1" />
-            <Text style={styles.addMemberButtonText}>Add Members</Text>
-          </TouchableOpacity>
-          {group.members.map(memberId => renderBalance(memberId))}
-          {Object.values(balances).every(b => b === 0) && (
+          
+          {/* User's summary section */}
+          {renderUserSummary()}
+          
+          {/* Other members' balances - only show if there are other members with balances */}
+          {group.members.some(memberId => {
+            if (memberId === user?.uid) return false;
+            const netBalance = calculatePairwiseBalance(groupId, user?.uid, memberId);
+            return netBalance !== 0;
+          }) && (
+            <View style={styles.otherMembersSection}>
+              <Text style={styles.otherMembersTitle}>Other Members</Text>
+              {group.members.map(memberId => renderOtherMemberBalance(memberId))}
+            </View>
+          )}
+          
+          {/* Show all settled message if everything is zero */}
+          {Object.values(balances).every(b => b === 0) && 
+           getUserTotalSpent() === 0 && (
             <View style={styles.settledContainer}>
               <Icon source="check-circle" size={32} color="#10B981" />
               <Text style={styles.settledText}>All settled up!</Text>
@@ -290,10 +370,94 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#6366F1",
   },
-  balanceItem: {
+  userSummarySection: {
+    backgroundColor: "#F8F9FA",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E9ECEF",
+  },
+  userSummaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  userSummaryTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  summaryStat: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E9ECEF",
+    marginBottom: 12,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#6C757D",
+  },
+  summaryAmount: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#6366F1",
+  },
+  owedSection: {
+    marginBottom: 12,
+  },
+  owedSectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6C757D",
+    marginBottom: 8,
+  },
+  owedItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
+    paddingLeft: 4,
+  },
+  owedName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#1A1A1A",
+  },
+  owedAmount: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  settledIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 8,
+  },
+  settledIndicatorText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#10B981",
+  },
+  otherMembersSection: {
+    marginTop: 8,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E9ECEF",
+  },
+  otherMembersTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6C757D",
+    marginBottom: 12,
+  },
+  balanceItem: {
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#F1F3F5",
@@ -315,23 +479,6 @@ const styles = StyleSheet.create({
   balanceAmount: {
     fontSize: 15,
     fontWeight: "600",
-  },
-  settleButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#F3F4F6",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  settleButtonActive: {
-    backgroundColor: "#6366F1",
-  },
-  settleButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6B7280",
   },
   settledContainer: {
     padding: 20,

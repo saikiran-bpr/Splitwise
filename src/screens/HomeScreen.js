@@ -12,7 +12,6 @@ import FriendsScreen from "./FriendsScreen";
 import GroupsScreen from "./GroupsScreen";
 import GroupDetailScreen from "./GroupDetailScreen";
 import AddExpenseScreen from "./AddExpenseScreen";
-import AddMemberToGroupScreen from "./AddMemberToGroupScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -34,11 +33,6 @@ function GroupsStack() {
         name="AddExpense" 
         component={AddExpenseScreen}
         options={{ presentation: "card", title: "Add Expense" }}
-      />
-      <Stack.Screen 
-        name="AddMember" 
-        component={AddMemberToGroupScreen}
-        options={{ presentation: "card", title: "Add Members" }}
       />
     </Stack.Navigator>
   );

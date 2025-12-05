@@ -100,7 +100,7 @@ export default function DataProvider({ children }) {
     return () => unsubscribeGroups();
   }, [user]);
 
-  // Fetch settled expenses
+  // Fetch settled expenses (supports more than 10 groups by chunking queries)
   useEffect(() => {
     if (!user || groups.length === 0) {
       setSettledExpenses([]);
@@ -113,22 +113,42 @@ export default function DataProvider({ children }) {
       return;
     }
 
-    const unsubscribeSettled = onSnapshot(
-      query(collection(db, "settledExpenses"), where("groupId", "in", groupIds.slice(0, 10))),
-      (snapshot) => {
-        const settledList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setSettledExpenses(settledList);
-      },
-      (error) => {
-        console.error("Error fetching settled expenses:", error);
-        setSettledExpenses([]);
-      }
+    const chunkSize = 10; // Firestore "in" supports up to 10 values
+    const chunks = [];
+    for (let i = 0; i < groupIds.length; i += chunkSize) {
+      chunks.push(groupIds.slice(i, i + chunkSize));
+    }
+
+    const unsubscribers = chunks.map(ids => 
+      onSnapshot(
+        query(collection(db, "settledExpenses"), where("groupId", "in", ids)),
+        (snapshot) => {
+          const newDocs = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          setSettledExpenses(prev => {
+            // Keep previous entries for other chunks, replace entries for current chunk
+            const filteredPrev = prev.filter(s => !ids.includes(s.groupId));
+            return [...filteredPrev, ...newDocs];
+          });
+        },
+        (error) => {
+          console.error("Error fetching settled expenses:", error);
+        }
+      )
     );
 
-    return () => unsubscribeSettled();
+    return () => {
+      unsubscribers.forEach(unsub => {
+        try {
+          unsub && unsub();
+        } catch (err) {
+          console.error("Error unsubscribing settledExpenses listener:", err);
+        }
+      });
+    };
   }, [user, groups]);
 
   const addFriend = async (email, name) => {
@@ -254,6 +274,7 @@ export default function DataProvider({ children }) {
         date: serverTimestamp(),
       });
     } catch (error) {
+      console.error("Error settling up:", error);
       throw error;
     }
   };
