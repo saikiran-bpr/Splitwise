@@ -263,6 +263,17 @@ export default function DataProvider({ children }) {
     }
   };
 
+  const updateExpense = async (groupId, expenseId, updates) => {
+    try {
+      const expenseRef = doc(db, "groups", groupId, "expenses", expenseId);
+      await updateDoc(expenseRef, updates);
+      console.log("Expense updated successfully:", expenseId);
+    } catch (error) {
+      console.error("Error updating expense:", error);
+      throw error;
+    }
+  };
+
   const settleUp = async (groupId, fromUserId, toUserId, amount) => {
     try {
       const settleRef = doc(collection(db, "settledExpenses"));
@@ -599,6 +610,7 @@ export default function DataProvider({ children }) {
         deleteGroup,
         addExpense,
         deleteExpense,
+        updateExpense,
         settleUp,
         calculateBalances,
         calculatePairwiseBalance,

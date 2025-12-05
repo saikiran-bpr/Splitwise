@@ -71,12 +71,20 @@ export default function GroupDetailScreen({ route, navigation }) {
           <View style={styles.expenseAmountContainer}>
             <Text style={styles.expenseAmount}>₹{item.amount.toFixed(2)}</Text>
             {isPaidByUser && (
-              <TouchableOpacity
-                onPress={() => handleDeleteExpense(item.id, item.description)}
-                style={styles.deleteButton}
-              >
-                <Icon source="delete" size={18} color="#EF4444" />
-              </TouchableOpacity>
+              <View style={styles.expenseActions}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("EditExpense", { groupId, expenseId: item.id })}
+                  style={styles.editButton}
+                >
+                  <Icon source="pencil" size={18} color="#6366F1" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleDeleteExpense(item.id, item.description)}
+                  style={styles.deleteButton}
+                >
+                  <Icon source="delete" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -265,6 +273,14 @@ export default function GroupDetailScreen({ route, navigation }) {
             <Icon source="account-balance-wallet" size={24} color="#6366F1" />
             <Text style={styles.sectionTitle}>Balances</Text>
           </View>
+          
+          <TouchableOpacity
+            style={styles.addMemberButton}
+            onPress={() => navigation.navigate("AddMember", { groupId })}
+          >
+            <Icon source="account-plus" size={18} color="#6366F1" />
+            <Text style={styles.addMemberButtonText}>Add Members</Text>
+          </TouchableOpacity>
           
           {/* User's summary section */}
           {renderUserSummary()}
@@ -534,6 +550,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#6366F1",
+  },
+  expenseActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  editButton: {
+    padding: 4,
   },
   deleteButton: {
     padding: 4,
