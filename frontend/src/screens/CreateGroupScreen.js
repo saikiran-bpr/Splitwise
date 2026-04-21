@@ -1,15 +1,30 @@
 // src/screens/CreateGroupScreen.js
-import React, { useState, useContext } from "react";
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, FlatList, Alert } from "react-native";
+import React, { useState, useContext, useEffect } from "react";
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, FlatList, Alert, ScrollView } from "react-native";
 import { DataContext } from "../context/DataContext";
 import { AuthContext } from "../context/AuthContext";
 
+const CATEGORIES = [
+  { key: "trip", label: "Trip", icon: "✈️" },
+  { key: "home", label: "Home", icon: "🏠" },
+  { key: "couple", label: "Couple", icon: "❤️" },
+  { key: "friends", label: "Friends", icon: "👥" },
+  { key: "work", label: "Work", icon: "💼" },
+  { key: "other", label: "Other", icon: "📂" },
+];
+
 export default function CreateGroupScreen({ navigation }) {
-  const { friends, createGroup } = useContext(DataContext);
+  const { friends, fetchFriends, createGroup } = useContext(DataContext);
   const { user } = useContext(AuthContext);
   const [groupName, setGroupName] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("friends");
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchFriends();
+  }, []);
 
   const toggleFriend = (friendId) => {
     if (selectedFriends.includes(friendId)) {
@@ -32,14 +47,16 @@ export default function CreateGroupScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await createGroup(groupName.trim(), selectedFriends);
+      await createGroup(groupName.trim(), selectedFriends, description.trim(), category);
       Alert.alert("Success", "Group created successfully!", [
-        { text: "OK", onPress: () => navigation.navigate("Groups") }
+        { text: "OK", onPress: () => navigation.goBack() }
       ]);
       setGroupName("");
+      setDescription("");
+      setCategory("friends");
       setSelectedFriends([]);
     } catch (err) {
-      Alert.alert("Error", "Failed to create group. Please try again.");
+      Alert.alert("Error", err.message || "Failed to create group. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -51,21 +68,39 @@ export default function CreateGroupScreen({ navigation }) {
     return colors[index];
   };
 
+  const renderCategoryChip = (cat) => {
+    const isSelected = category === cat.key;
+    return (
+      <TouchableOpacity
+        key={cat.key}
+        style={[styles.categoryChip, isSelected && styles.categoryChipSelected]}
+        onPress={() => setCategory(cat.key)}
+      >
+        <Text style={styles.categoryChipIcon}>{cat.icon}</Text>
+        <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}>
+          {cat.label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
   const renderFriend = ({ item }) => {
-    const isSelected = selectedFriends.includes(item.id);
-    const avatarColor = getAvatarColor(item.name);
-    
+    const isSelected = selectedFriends.includes(item._id);
+    const avatarColor = getAvatarColor(item.name || item.email);
+
     return (
       <TouchableOpacity
         style={[styles.friendItem, isSelected && styles.friendItemSelected]}
-        onPress={() => toggleFriend(item.id)}
+        onPress={() => toggleFriend(item._id)}
       >
         <View style={styles.friendContent}>
           <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
             {isSelected && <Text style={styles.checkmark}>✓</Text>}
           </View>
           <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>
+              {(item.name || item.email).charAt(0).toUpperCase()}
+            </Text>
           </View>
           <View style={styles.friendInfo}>
             <Text style={styles.friendName}>{item.name}</Text>
@@ -95,6 +130,30 @@ export default function CreateGroupScreen({ navigation }) {
           />
         </View>
 
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Category</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryRow}
+          >
+            {CATEGORIES.map(renderCategoryChip)}
+          </ScrollView>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Description (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Add a short description..."
+            placeholderTextColor="#9CA3AF"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={2}
+          />
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.label}>Select Friends</Text>
           <Text style={styles.hint}>
@@ -110,7 +169,7 @@ export default function CreateGroupScreen({ navigation }) {
         ) : (
           <FlatList
             data={friends}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item._id}
             renderItem={renderFriend}
             style={styles.friendsList}
             contentContainerStyle={styles.friendsListContent}
@@ -135,7 +194,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     marginTop: 40,
-
     backgroundColor: "#F8F9FA",
   },
   header: {
@@ -183,6 +241,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111827",
     backgroundColor: "#FFFFFF",
+  },
+  textArea: {
+    minHeight: 60,
+    textAlignVertical: "top",
+  },
+  categoryRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingVertical: 4,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    gap: 6,
+  },
+  categoryChipSelected: {
+    borderColor: "#6366F1",
+    backgroundColor: "#EEF2FF",
+  },
+  categoryChipIcon: {
+    fontSize: 16,
+  },
+  categoryChipText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6C757D",
+  },
+  categoryChipTextSelected: {
+    color: "#6366F1",
   },
   friendsList: {
     flex: 1,

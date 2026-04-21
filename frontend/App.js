@@ -1,4 +1,3 @@
-// App.js
 import React, { useContext } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -32,7 +31,7 @@ function AppStack() {
 
 function RootNavigator() {
   const { user, loading } = useContext(AuthContext);
-  
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>

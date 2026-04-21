@@ -19,20 +19,15 @@ export default function LoginScreen({ navigation }) {
     try {
       await login(email.trim(), password);
     } catch (err) {
-      let message = "Failed to login. Please try again.";
-      if (err.code === "auth/user-not-found") message = "No account found with this email.";
-      else if (err.code === "auth/wrong-password") message = "Incorrect password.";
-      else if (err.code === "auth/invalid-email") message = "Invalid email.";
-      else if (err.code === "auth/invalid-credential") message = "Invalid email or password.";
-      Alert.alert("Login Error", message);
+      Alert.alert("Login Error", err.message || "Failed to login. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.content}>
@@ -77,16 +72,16 @@ export default function LoginScreen({ navigation }) {
             />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleLogin} 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
             disabled={loading}
           >
             <Icon source="login" size={20} color="#FFFFFF" />
             <Text style={styles.buttonText}>{loading ? "Logging in..." : "Sign In"}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.linkContainer}
             onPress={() => navigation.navigate("Signup")}
           >

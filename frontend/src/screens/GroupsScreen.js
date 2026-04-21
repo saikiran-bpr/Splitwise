@@ -1,13 +1,26 @@
 // src/screens/GroupsScreen.js
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, RefreshControl } from "react-native";
 import { DataContext } from "../context/DataContext";
 import { AuthContext } from "../context/AuthContext";
 
+const CATEGORY_ICONS = {
+  trip: "✈️",
+  home: "🏠",
+  couple: "❤️",
+  friends: "👥",
+  work: "💼",
+  other: "📂",
+};
+
 export default function GroupsScreen({ navigation }) {
-  const { groups, calculateBalances, getUserName, refreshData, refreshing } = useContext(DataContext);
+  const { groups, fetchGroups, refreshData, refreshing } = useContext(DataContext);
   const { user } = useContext(AuthContext);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    fetchGroups();
+  }, []);
 
   const filteredGroups = groups.filter(group =>
     group.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -20,20 +33,14 @@ export default function GroupsScreen({ navigation }) {
   };
 
   const renderGroup = ({ item }) => {
-    const balances = calculateBalances(item.id);
-    const userBalance = balances[user?.uid] || 0;
-    const balanceColor = userBalance > 0 ? "#10B981" : userBalance < 0 ? "#EF4444" : "#6B7280";
-    const balanceText = userBalance > 0 
-      ? `You are owed ₹${Math.abs(userBalance).toFixed(2)}`
-      : userBalance < 0 
-      ? `You owe ₹${Math.abs(userBalance).toFixed(2)}`
-      : "Settled up";
+    const memberCount = item.members ? item.members.length : 0;
     const groupColor = getGroupColor(item.name);
+    const categoryIcon = CATEGORY_ICONS[item.category] || CATEGORY_ICONS.other;
 
     return (
       <TouchableOpacity
         style={styles.groupCard}
-        onPress={() => navigation.navigate("GroupDetail", { groupId: item.id })}
+        onPress={() => navigation.navigate("GroupDetail", { groupId: item._id })}
       >
         <View style={styles.groupHeader}>
           <View style={[styles.groupIcon, { backgroundColor: groupColor }]}>
@@ -42,20 +49,34 @@ export default function GroupsScreen({ navigation }) {
           <View style={styles.groupInfo}>
             <Text style={styles.groupName}>{item.name}</Text>
             <Text style={styles.groupMembers}>
-              {item.members.length} member{item.members.length !== 1 ? 's' : ''}
+              {memberCount} member{memberCount !== 1 ? 's' : ''}
             </Text>
           </View>
         </View>
         <View style={styles.groupFooter}>
-          <View style={[styles.balanceBadge, { backgroundColor: balanceColor === "#10B981" ? "#D1FAE5" : balanceColor === "#EF4444" ? "#FEE2E2" : "#F3F4F6" }]}>
-            <Text style={[styles.balanceText, { color: balanceColor }]}>
-              {balanceText}
+          {item.category ? (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryIcon}>{categoryIcon}</Text>
+              <Text style={styles.categoryText}>
+                {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>General</Text>
+            </View>
+          )}
+          <View style={styles.memberBadge}>
+            <Text style={styles.memberBadgeText}>
+              {memberCount} member{memberCount !== 1 ? 's' : ''}
             </Text>
           </View>
-          <Text style={styles.expenseCount}>
-            {item.expenses.length} expense{item.expenses.length !== 1 ? 's' : ''}
-          </Text>
         </View>
+        {item.description ? (
+          <Text style={styles.groupDescription} numberOfLines={1}>
+            {item.description}
+          </Text>
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -63,8 +84,18 @@ export default function GroupsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Groups</Text>
-        <Text style={styles.subtitle}>{groups.length} group{groups.length !== 1 ? 's' : ''}</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>Groups</Text>
+            <Text style={styles.subtitle}>{groups.length} group{groups.length !== 1 ? 's' : ''}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => navigation.navigate("CreateGroup")}
+          >
+            <Text style={styles.createButtonText}>+ Create</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -85,11 +116,19 @@ export default function GroupsScreen({ navigation }) {
           <Text style={styles.emptySubtext}>
             {searchQuery ? "Try a different search" : "Create a group to start splitting expenses"}
           </Text>
+          {!searchQuery && (
+            <TouchableOpacity
+              style={styles.emptyCreateButton}
+              onPress={() => navigation.navigate("CreateGroup")}
+            >
+              <Text style={styles.emptyCreateButtonText}>Create Group</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList
           data={filteredGroups}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item._id}
           renderItem={renderGroup}
           contentContainerStyle={styles.list}
           refreshControl={
@@ -111,13 +150,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
     marginTop: 40,
-
   },
   header: {
     backgroundColor: "#FFFFFF",
     padding: 24,
     borderBottomWidth: 1,
     borderBottomColor: "#E9ECEF",
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   title: {
     fontSize: 32,
@@ -128,6 +171,22 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: "#6C757D",
+  },
+  createButton: {
+    backgroundColor: "#6366F1",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: "#6366F1",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  createButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
   },
   searchContainer: {
     padding: 16,
@@ -199,19 +258,38 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F1F3F5",
   },
-  balanceBadge: {
+  categoryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  categoryIcon: {
+    fontSize: 14,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6366F1",
+  },
+  memberBadge: {
+    backgroundColor: "#F3F4F6",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
-  balanceText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  expenseCount: {
+  memberBadgeText: {
     fontSize: 14,
     color: "#6C757D",
     fontWeight: "500",
+  },
+  groupDescription: {
+    fontSize: 13,
+    color: "#6C757D",
+    marginTop: 12,
   },
   emptyState: {
     flex: 1,
@@ -229,5 +307,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6C757D",
     textAlign: "center",
+    marginBottom: 20,
+  },
+  emptyCreateButton: {
+    backgroundColor: "#6366F1",
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  emptyCreateButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

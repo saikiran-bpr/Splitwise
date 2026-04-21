@@ -1,12 +1,18 @@
 // src/screens/AddFriendScreen.js
 import React, { useState, useContext } from "react";
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { DataContext } from "../context/DataContext";
 
-export default function AddFriendScreen() {
-  const { addFriend, friends } = useContext(DataContext);
+export default function AddFriendScreen({ navigation }) {
+  const { addFriend } = useContext(DataContext);
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleAddFriend = async () => {
@@ -15,21 +21,33 @@ export default function AddFriendScreen() {
       return;
     }
 
-    // Check if friend already exists
-    if (friends.some(f => f.email.toLowerCase() === email.trim().toLowerCase())) {
-      Alert.alert("Already Added", "This friend is already in your list.");
+    // Basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert("Validation", "Please enter a valid email address.");
       return;
     }
 
     setLoading(true);
     try {
-      await addFriend(email.trim(), name.trim() || undefined);
-      Alert.alert("Success", "Friend added successfully!");
-      setEmail("");
-      setName("");
+      await addFriend(email.trim());
+      Alert.alert("Success", "Friend added successfully!", [
+        {
+          text: "OK",
+          onPress: () => {
+            setEmail("");
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            }
+          },
+        },
+      ]);
     } catch (err) {
-      console.log(err);
-      Alert.alert("Error", "Failed to add friend. Please try again.");
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to add friend. Please try again.";
+      Alert.alert("Error", message);
     } finally {
       setLoading(false);
     }
@@ -39,7 +57,9 @@ export default function AddFriendScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Add Friend</Text>
-        <Text style={styles.subtitle}>Add friends to split expenses with</Text>
+        <Text style={styles.subtitle}>
+          Enter their email to add them as a friend
+        </Text>
       </View>
 
       <View style={styles.form}>
@@ -51,24 +71,14 @@ export default function AddFriendScreen() {
             placeholderTextColor="#9CA3AF"
             autoCapitalize="none"
             keyboardType="email-address"
+            autoCorrect={false}
             value={email}
             onChangeText={setEmail}
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Name (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Friend's name"
-            placeholderTextColor="#9CA3AF"
-            value={name}
-            onChangeText={setName}
-          />
-        </View>
-
-        <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]} 
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleAddFriend}
           disabled={loading}
         >
@@ -86,7 +96,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
     marginTop: 40,
-
   },
   header: {
     backgroundColor: "#FFFFFF",

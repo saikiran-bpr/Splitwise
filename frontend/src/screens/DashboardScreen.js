@@ -1,60 +1,95 @@
 // src/screens/DashboardScreen.js
-import React, { useContext } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import React, { useContext, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import { DataContext } from "../context/DataContext";
 import { AuthContext } from "../context/AuthContext";
 import { Icon } from "react-native-paper";
 
 export default function DashboardScreen({ navigation }) {
-  const { groups, getTotalBalance, getRecentActivity, getUserName, loading, refreshData, refreshing } = useContext(DataContext);
+  const { balances, activities, loading, refreshData, refreshing } =
+    useContext(DataContext);
   const { user, logout } = useContext(AuthContext);
 
-  const { totalOwed, totalOwing } = getTotalBalance();
-  const recentActivity = getRecentActivity().slice(0, 5);
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  const totalOwed = balances?.totalOwed ?? 0;
+  const totalOwe = balances?.totalOwe ?? 0;
+  const netBalance = totalOwed - totalOwe;
+
+  const recentActivity = (activities ?? []).slice(0, 5);
 
   const handleSignOut = () => {
     logout();
   };
 
-  const renderActivityItem = (activity) => {
-    if (activity.type === "expense") {
-      return (
-        <View key={activity.id} style={styles.activityItem}>
-          <View style={[styles.activityIcon, { backgroundColor: "#EEF2FF" }]}>
-            <Icon source="cash" size={24} color="#6366F1" />
-          </View>
-          <View style={styles.activityContent}>
-            <Text style={styles.activityText}>
-              <Text style={styles.activityBold}>{getUserName(activity.paidBy)}</Text> added{" "}
-              <Text style={styles.activityBold}>₹{activity.amount.toFixed(2)}</Text> in{" "}
-              <Text style={styles.activityBold}>{activity.groupName}</Text>
-            </Text>
-            <Text style={styles.activityDescription}>{activity.description}</Text>
-            <Text style={styles.activityDate}>
-              {new Date(activity.date).toLocaleDateString()}
-            </Text>
-          </View>
-        </View>
-      );
-    } else {
-      return (
-        <View key={activity.id} style={styles.activityItem}>
-          <View style={[styles.activityIcon, { backgroundColor: "#D1FAE5" }]}>
-            <Icon source="check-circle" size={24} color="#10B981" />
-          </View>
-          <View style={styles.activityContent}>
-            <Text style={styles.activityText}>
-              <Text style={styles.activityBold}>{getUserName(activity.fromUserId)}</Text> settled{" "}
-              <Text style={styles.activityBold}>₹{activity.amount.toFixed(2)}</Text> with{" "}
-              <Text style={styles.activityBold}>{getUserName(activity.toUserId)}</Text>
-            </Text>
-            <Text style={styles.activityDate}>
-              {new Date(activity.date).toLocaleDateString()}
-            </Text>
-          </View>
-        </View>
-      );
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case "expense_added":
+        return { icon: "cash", color: "#6366F1", bg: "#EEF2FF" };
+      case "settlement_added":
+        return { icon: "check-circle", color: "#10B981", bg: "#D1FAE5" };
+      case "group_created":
+        return { icon: "account-group", color: "#F59E0B", bg: "#FEF3C7" };
+      case "friend_added":
+        return { icon: "account-plus", color: "#8B5CF6", bg: "#EDE9FE" };
+      default:
+        return { icon: "bell", color: "#6C757D", bg: "#F1F3F5" };
     }
+  };
+
+  const getActivityText = (activity) => {
+    const { type, actor, metadata } = activity;
+    const actorName = actor?.name ?? "Someone";
+    const amount = metadata?.amount != null ? `₹${Number(metadata.amount).toFixed(2)}` : "";
+    const description = metadata?.description ?? "";
+    const targetUserName = metadata?.targetUserName ?? "";
+    const groupName = metadata?.groupName ?? activity.group?.name ?? "";
+
+    switch (type) {
+      case "expense_added":
+        return { primary: `${actorName} added ${amount} for "${description}"`, secondary: groupName ? `in ${groupName}` : "" };
+      case "settlement_added":
+        return { primary: `${actorName} settled ${amount} with ${targetUserName}`, secondary: groupName ? `in ${groupName}` : "" };
+      case "group_created":
+        return { primary: `${actorName} created group "${groupName}"`, secondary: "" };
+      case "friend_added":
+        return { primary: `${actorName} added ${targetUserName} as a friend`, secondary: "" };
+      default:
+        return { primary: `${actorName} performed an action`, secondary: "" };
+    }
+  };
+
+  const renderActivityItem = (activity, index) => {
+    const { icon, color, bg } = getActivityIcon(activity.type);
+    const { primary, secondary } = getActivityText(activity);
+    const key = activity._id ?? `activity-${index}`;
+
+    return (
+      <View key={key} style={styles.activityItem}>
+        <View style={[styles.activityIcon, { backgroundColor: bg }]}>
+          <Icon source={icon} size={24} color={color} />
+        </View>
+        <View style={styles.activityContent}>
+          <Text style={styles.activityText}>{primary}</Text>
+          {secondary ? (
+            <Text style={styles.activityDescription}>{secondary}</Text>
+          ) : null}
+          <Text style={styles.activityDate}>
+            {new Date(activity.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+      </View>
+    );
   };
 
   if (loading) {
@@ -66,7 +101,7 @@ export default function DashboardScreen({ navigation }) {
   }
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl
@@ -80,13 +115,16 @@ export default function DashboardScreen({ navigation }) {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Dashboard</Text>
-          <Text style={styles.subtitle}>Welcome back, {user?.name || user?.email?.split("@")[0]}</Text>
+          <Text style={styles.subtitle}>
+            Welcome back, {user?.name || user?.email?.split("@")[0]}
+          </Text>
         </View>
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
           <Icon source="logout" size={20} color="#EF4444" />
         </TouchableOpacity>
       </View>
 
+      {/* Balance Stat Cards */}
       <View style={styles.statsContainer}>
         <View style={[styles.statCard, styles.statCardGreen]}>
           <View style={styles.statIconContainer}>
@@ -103,21 +141,50 @@ export default function DashboardScreen({ navigation }) {
           </View>
           <View>
             <Text style={styles.statLabel}>You owe</Text>
-            <Text style={styles.statAmountRed}>₹{totalOwing.toFixed(2)}</Text>
+            <Text style={styles.statAmountRed}>₹{totalOwe.toFixed(2)}</Text>
           </View>
         </View>
       </View>
 
+      {/* Net Balance Card */}
+      <View style={styles.netBalanceContainer}>
+        <View
+          style={[
+            styles.netBalanceCard,
+            netBalance >= 0 ? styles.netBalancePositive : styles.netBalanceNegative,
+          ]}
+        >
+          <Text style={styles.netBalanceLabel}>Net Balance</Text>
+          <Text
+            style={[
+              styles.netBalanceAmount,
+              { color: netBalance >= 0 ? "#10B981" : "#EF4444" },
+            ]}
+          >
+            {netBalance >= 0 ? "+" : "-"}₹{Math.abs(netBalance).toFixed(2)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Quick Actions */}
       <View style={styles.quickActions}>
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate("Groups")}
         >
           <Icon source="account-group" size={20} color="#FFFFFF" />
-          <Text style={styles.actionButtonText}>View Groups ({groups.length})</Text>
+          <Text style={styles.actionButtonText}>View Groups</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.actionButtonSecondary]}
+          onPress={() => navigation.navigate("Groups")}
+        >
+          <Icon source="plus-circle" size={20} color="#FFFFFF" />
+          <Text style={styles.actionButtonText}>Add Expense</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Recent Activity */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Icon source="clock-outline" size={20} color="#6366F1" />
@@ -129,7 +196,9 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.emptyText}>No recent activity</Text>
           </View>
         ) : (
-          recentActivity.map(activity => renderActivityItem(activity))
+          recentActivity.map((activity, index) =>
+            renderActivityItem(activity, index)
+          )
         )}
       </View>
     </ScrollView>
@@ -217,9 +286,38 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#EF4444",
   },
+  netBalanceContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  netBalanceCard: {
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  netBalancePositive: {
+    borderColor: "#D1FAE5",
+    backgroundColor: "#F0FDF4",
+  },
+  netBalanceNegative: {
+    borderColor: "#FEE2E2",
+    backgroundColor: "#FEF2F2",
+  },
+  netBalanceLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#6C757D",
+    marginBottom: 4,
+  },
+  netBalanceAmount: {
+    fontSize: 24,
+    fontWeight: "700",
+  },
   quickActions: {
     paddingHorizontal: 16,
     marginBottom: 24,
+    gap: 12,
   },
   actionButton: {
     backgroundColor: "#6366F1",
@@ -234,6 +332,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,
+  },
+  actionButtonSecondary: {
+    backgroundColor: "#10B981",
+    shadowColor: "#10B981",
   },
   actionButtonText: {
     color: "#FFFFFF",
@@ -282,10 +384,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#495057",
     marginBottom: 4,
-  },
-  activityBold: {
-    fontWeight: "600",
-    color: "#1A1A1A",
   },
   activityDescription: {
     fontSize: 13,

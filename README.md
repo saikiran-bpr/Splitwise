@@ -1,298 +1,293 @@
-# 💰 Splitwise App
+# Splitwise Clone
 
-A React Native mobile application built with Expo for splitting expenses with friends and groups. This app helps you track shared expenses, split bills, and settle up seamlessly.
+A full-stack expense splitting application built with React Native (Expo) and Node.js. Track shared expenses, split bills with multiple methods, simplify debts, and settle up with friends.
 
-## ✨ Features
+## Tech Stack
 
-### 🏠 Dashboard
-- **Balance Overview**: View total amount you're owed and total amount you owe across all groups
-- **Recent Activity**: See your latest expense additions and settlements at a glance
-- **Quick Access**: Navigate to groups, friends, and other sections easily
+**Frontend:** React Native, Expo, React Navigation, React Native Paper  
+**Backend:** Node.js, Express.js, MongoDB, Mongoose  
+**Auth:** JWT (JSON Web Tokens) with bcrypt password hashing
 
-### 👥 Friends Management
-- **Add Friends**: Search and add friends by email address
-- **View Friends List**: See all your added friends in one place
-- **Remove Friends**: Manage your friend list easily
+## Features
 
-### 📊 Groups & Expenses
-- **Create Groups**: Form groups with multiple friends for shared expenses
-- **Add Members**: Invite friends to existing groups anytime
-- **Add Expenses**: 
-  - Record expenses with descriptions
-  - Split expenses equally among selected members
-  - Track who paid for each expense
-- **View Group Details**: See all expenses and balances for a specific group
-- **Delete Expenses**: Remove expenses you've created (only for expenses you paid)
+### Expense Management
+- **4 Split Types** - Equal, exact amounts, percentage-based, or share-based splitting
+- **10 Categories** - Food, transport, entertainment, shopping, utilities, rent, travel, health, education, other
+- **Comments** - Add and view comments on any expense
+- **Edit/Delete** - Modify or remove expenses (creator/payer only)
 
-### 💵 Balance & Settlements
-- **Pairwise Balance Calculation**: Accurately calculate what each person owes/is owed
-- **Visual Balance Display**: 
-  - Green for amounts owed to you
-  - Red for amounts you owe
-  - Clear indicators with arrows
-- **Settle Up**: 
-  - Mark payments as settled when you pay someone
-  - Request payment from others who owe you
-- **Smart Settlement Logic**: Correctly handles who paid and who should pay back
+### Groups
+- **Group Categories** - Trip, home, couple, friends, work, other
+- **Member Management** - Add or remove members anytime
+- **Group Balances** - See who owes whom within each group
+- **Debt Simplification** - Minimizes the number of transactions needed to settle up
 
-### 🔐 Authentication
-- **Email/Password Sign Up**: Create a new account
-- **Secure Login**: Sign in with your credentials
-- **Persistent Sessions**: Stay logged in across app restarts
-- **Logout**: Sign out securely
+### Friends
+- **Add by Email** - Find and add friends who are already registered
+- **Search** - Search users by name or email
+- **Friend Balances** - View balance breakdown with each friend across all groups
 
-## 🛠️ Tech Stack
+### Settlements
+- **Settle Up** - Record payments between users
+- **Per-Group or Overall** - Settle within a specific group or across all debts
+- **Suggested Amounts** - Pre-filled amounts based on what's owed
 
-- **Framework**: React Native with Expo (~54.0.25)
-- **Navigation**: React Navigation v7 (Native Stack & Bottom Tabs)
-- **State Management**: React Context API
-- **Backend**: Firebase (Firestore & Authentication)
-- **UI Components**: React Native Paper
-- **Storage**: AsyncStorage for auth persistence
+### Dashboard
+- **Balance Overview** - Total owed to you, total you owe, net balance
+- **Recent Activity** - Latest expenses, settlements, and group updates
+- **Quick Actions** - Fast access to groups and common tasks
 
-### Key Dependencies
-```
-expo: ~54.0.25
-react: 19.1.0
-react-native: 0.81.5
-firebase: ^12.6.0
-@react-navigation/native: ^7.1.24
-react-native-paper: ^5.14.5
-```
+### Activity Feed
+- Tracks all actions: expenses added/edited/deleted, settlements, group changes, member updates
+- Paginated feed with pull-to-refresh
 
-## 📋 Prerequisites
+### User Profile
+- Edit name, phone, currency preference
+- Change password
+- Account statistics (groups, friends, balance)
 
-Before you begin, ensure you have the following installed:
-- [Node.js](https://nodejs.org/) (v14 or higher)
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-- [Expo CLI](https://docs.expo.dev/get-started/installation/) (`npm install -g expo-cli`)
-- [Expo Go](https://expo.dev/client) app on your iOS/Android device (for testing)
-- A Firebase project with Firestore and Authentication enabled
+### Authentication
+- Email/password registration and login
+- JWT-based session persistence
+- Secure password hashing with bcrypt
 
-## 🚀 Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd splitwise/splitwise-app
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-3. **Configure Firebase**
-   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
-   - Enable Authentication (Email/Password provider)
-   - Enable Cloud Firestore Database
-   - Copy your Firebase configuration
-   - Update `firebase.js` with your configuration:
-   
-   ```javascript
-   const firebaseConfig = {
-     apiKey: "YOUR_API_KEY",
-     authDomain: "YOUR_AUTH_DOMAIN",
-     projectId: "YOUR_PROJECT_ID",
-     storageBucket: "YOUR_STORAGE_BUCKET",
-     messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-     appId: "YOUR_APP_ID",
-     measurementId: "YOUR_MEASUREMENT_ID"
-   };
-   ```
-
-4. **Set up Firestore Security Rules**
-   ```javascript
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       // Users can only access their own user data
-       match /users/{userId} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
-         
-         // Friends subcollection
-         match /friends/{friendId} {
-           allow read, write: if request.auth != null && request.auth.uid == userId;
-         }
-       }
-       
-       // Groups - members can read, creator can write
-       match /groups/{groupId} {
-         allow read: if request.auth != null && request.auth.uid in resource.data.members;
-         allow create: if request.auth != null;
-         allow update, delete: if request.auth != null && request.auth.uid == resource.data.createdBy;
-         
-         // Expenses subcollection
-         match /expenses/{expenseId} {
-           allow read: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.members;
-           allow create: if request.auth != null;
-           allow delete: if request.auth != null && request.auth.uid == resource.data.paidBy;
-         }
-       }
-       
-       // Settled expenses
-       match /settledExpenses/{settleId} {
-         allow read: if request.auth != null;
-         allow create: if request.auth != null;
-       }
-     }
-   }
-   ```
-
-5. **Start the development server**
-   ```bash
-   npm start
-   # or
-   expo start
-   ```
-
-6. **Run on your device**
-   - Scan the QR code with Expo Go (iOS) or the Expo app (Android)
-   - Press `i` for iOS simulator
-   - Press `a` for Android emulator
-
-## 📱 Usage
-
-### Getting Started
-1. **Sign Up**: Create a new account with your email and password
-2. **Add Friends**: Search for friends by email and add them to your friend list
-3. **Create Groups**: Form a group with your friends (e.g., "Roommates", "Trip to NYC")
-4. **Add Expenses**: Record who paid and split the expense among group members
-5. **Settle Up**: Mark payments as settled or request payments from others
-
-### Understanding Balances
-- **Green Balance (Positive)**: Someone owes you money
-  - Shows "owes you ₹X" with a Request button
-- **Red Balance (Negative)**: You owe someone money
-  - Shows "you owe ₹X" with a Settle Up button
-- **Zero Balance**: All settled up!
-
-### How Expenses Work
-When you add an expense:
-- The person who creates the expense is marked as the payer
-- The total amount is split equally among selected members
-- The app automatically calculates who owes whom
-- Example: If Alice pays ₹100 for dinner split between Alice and Bob:
-  - Alice paid: ₹100
-  - Alice's share: ₹50
-  - Bob's share: ₹50
-  - Result: Bob owes Alice ₹50
-
-## 📁 Project Structure
+## Project Structure
 
 ```
-splitwise-app/
-├── App.js                 # Main app component with navigation setup
-├── app.json              # Expo configuration
-├── firebase.js           # Firebase initialization and configuration
-├── index.js              # App entry point
-├── package.json          # Dependencies and scripts
-├── assets/               # Images and icons
-│   ├── icon.png
-│   ├── splash-icon.png
-│   └── ...
-└── src/
-    ├── context/          # Context providers for state management
-    │   ├── AuthContext.js    # Authentication state and methods
-    │   └── DataContext.js    # Data fetching and business logic
-    ├── screens/          # Screen components
-    │   ├── LoginScreen.js
-    │   ├── SignupScreen.js
-    │   ├── HomeScreen.js         # Bottom tab navigator
-    │   ├── DashboardScreen.js    # Overview dashboard
-    │   ├── FriendsScreen.js      # Friends list
-    │   ├── AddFriendScreen.js    # Add new friends
-    │   ├── GroupsScreen.js       # Groups list
-    │   ├── CreateGroupScreen.js  # Create new groups
-    │   ├── GroupDetailScreen.js  # Group expenses and balances
-    │   ├── AddExpenseScreen.js   # Add expenses to groups
-    │   └── AddMemberToGroupScreen.js  # Add members to groups
-    └── navigation/       # Navigation configuration (if any)
+Splitwise/
+├── backend/
+│   ├── config/
+│   │   └── db.js                 # MongoDB connection
+│   ├── middleware/
+│   │   ├── auth.js               # JWT authentication
+│   │   └── errorHandler.js       # Global error handler
+│   ├── models/
+│   │   ├── User.js
+│   │   ├── Group.js
+│   │   ├── Expense.js
+│   │   ├── Settlement.js
+│   │   └── Activity.js
+│   ├── routes/
+│   │   ├── auth.js               # Register, login, profile
+│   │   ├── friends.js            # Add, remove, search friends
+│   │   ├── groups.js             # CRUD groups, manage members
+│   │   ├── expenses.js           # CRUD expenses, comments
+│   │   ├── settlements.js        # Record settlements
+│   │   ├── balances.js           # Balance calculations
+│   │   └── activity.js           # Activity feed
+│   ├── utils/
+│   │   ├── debtSimplifier.js     # Debt minimization algorithm
+│   │   └── helpers.js            # Split calculators
+│   ├── server.js
+│   ├── .env
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── context/
+│   │   │   ├── AuthContext.js     # Auth state & methods
+│   │   │   └── DataContext.js     # App data & API calls
+│   │   ├── screens/
+│   │   │   ├── LoginScreen.js
+│   │   │   ├── SignupScreen.js
+│   │   │   ├── HomeScreen.js           # Tab navigator
+│   │   │   ├── DashboardScreen.js
+│   │   │   ├── GroupsScreen.js
+│   │   │   ├── CreateGroupScreen.js
+│   │   │   ├── GroupDetailScreen.js
+│   │   │   ├── AddExpenseScreen.js
+│   │   │   ├── EditExpenseScreen.js
+│   │   │   ├── ExpenseDetailScreen.js
+│   │   │   ├── FriendsScreen.js
+│   │   │   ├── AddFriendScreen.js
+│   │   │   ├── AddMemberToGroupScreen.js
+│   │   │   ├── SettleUpScreen.js
+│   │   │   ├── ActivityScreen.js
+│   │   │   └── ProfileScreen.js
+│   │   └── services/
+│   │       └── api.js             # API client
+│   ├── assets/
+│   ├── App.js
+│   ├── app.json
+│   └── package.json
+└── README.md
 ```
 
-## 🔑 Key Features Explained
+## API Endpoints
 
-### Pairwise Balance Calculation
-The app uses a sophisticated balance calculation system that:
-- Calculates balances between each pair of users separately
-- Only considers expenses shared between two specific users
-- Accounts for settlements between users
-- Ensures accurate "who owes whom" tracking
+### Auth
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login |
+| GET | `/api/auth/me` | Get current user |
+| PUT | `/api/auth/profile` | Update profile |
+| PUT | `/api/auth/change-password` | Change password |
 
-### Real-time Updates
-- Uses Firebase Firestore real-time listeners
-- Updates automatically when expenses are added/deleted
-- Reflects settlements immediately across all devices
+### Friends
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/friends` | Get all friends |
+| POST | `/api/friends/add` | Add friend by email |
+| DELETE | `/api/friends/:id` | Remove friend |
+| GET | `/api/friends/search?q=` | Search users |
 
-### Data Persistence
-- Authentication state persists using AsyncStorage
-- All data stored securely in Firebase Cloud Firestore
-- Offline support with Firebase's offline persistence
+### Groups
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/groups` | Get all groups |
+| POST | `/api/groups` | Create group |
+| GET | `/api/groups/:id` | Get group with expenses & settlements |
+| PUT | `/api/groups/:id` | Update group |
+| DELETE | `/api/groups/:id` | Delete group |
+| POST | `/api/groups/:id/members` | Add members |
+| DELETE | `/api/groups/:id/members/:userId` | Remove member |
 
-## 🐛 Troubleshooting
+### Expenses
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/expenses` | Create expense |
+| GET | `/api/expenses/group/:groupId` | Get group expenses (paginated) |
+| GET | `/api/expenses/user` | Get user's expenses |
+| GET | `/api/expenses/:id` | Get expense detail |
+| PUT | `/api/expenses/:id` | Update expense |
+| DELETE | `/api/expenses/:id` | Delete expense |
+| POST | `/api/expenses/:id/comments` | Add comment |
+| DELETE | `/api/expenses/:id/comments/:commentId` | Delete comment |
 
-### Common Issues
+### Settlements
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/settlements` | Record settlement |
+| GET | `/api/settlements` | Get all user settlements |
+| GET | `/api/settlements/group/:groupId` | Get group settlements |
+| DELETE | `/api/settlements/:id` | Delete settlement |
 
-**Firebase connection errors**
-- Verify your Firebase configuration in `firebase.js`
-- Check that Firestore and Authentication are enabled
-- Ensure your security rules allow the operations
+### Balances
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/balances/overall` | Overall balances with all friends |
+| GET | `/api/balances/group/:groupId` | Group balances + simplified debts |
+| GET | `/api/balances/friend/:friendId` | Balance with specific friend |
 
-**Navigation errors**
-- Clear Expo cache: `expo start -c`
-- Reinstall node_modules: `rm -rf node_modules && npm install`
+### Activity
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/activity` | User's activity feed (paginated) |
+| GET | `/api/activity/group/:groupId` | Group activity (paginated) |
 
-**Authentication not persisting**
-- Check that AsyncStorage is properly configured
-- Verify Firebase auth initialization in `firebase.js`
+## Prerequisites
 
-**Balance calculation issues**
-- Ensure expenses include both payer and all split members
-- Check that settlements are being recorded correctly
-- Verify pairwise balance calculation is working
+- [Node.js](https://nodejs.org/) v16+
+- [MongoDB](https://www.mongodb.com/) (local install or [Atlas](https://www.mongodb.com/atlas) cloud)
+- [Expo CLI](https://docs.expo.dev/) (`npm install -g expo-cli`)
+- [Expo Go](https://expo.dev/client) app on your phone (for testing)
 
-## 🚧 Future Enhancements
+## Getting Started
 
-Potential features to add:
-- [ ] Unequal expense splitting (custom amounts per person)
-- [ ] Currency conversion support
-- [ ] Expense categories and tags
-- [ ] Monthly/Yearly expense reports
-- [ ] Recurring expenses
-- [ ] Expense attachments (receipts/photos)
-- [ ] Push notifications for settlements
-- [ ] Export expense data to CSV
-- [ ] Multi-currency support
-- [ ] Expense reminders
+### 1. Clone the repository
 
-## 🤝 Contributing
+```bash
+git clone <repository-url>
+cd Splitwise
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+### 2. Set up the backend
 
-### Development Guidelines
-1. Follow React Native best practices
-2. Maintain consistent code style
-3. Add comments for complex logic
-4. Test on both iOS and Android when possible
-5. Update documentation as needed
+```bash
+cd backend
+npm install
+```
 
-## 📄 License
+Configure the environment variables in `.env`:
+
+```env
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/splitwise   # or your MongoDB Atlas URI
+JWT_SECRET=your_secret_key_here
+JWT_EXPIRE=30d
+```
+
+Start the backend server:
+
+```bash
+npm run dev
+```
+
+The API will be available at `http://localhost:5000`.
+
+### 3. Set up the frontend
+
+```bash
+cd frontend
+npm install
+```
+
+Start the Expo development server:
+
+```bash
+npx expo start
+```
+
+Scan the QR code with Expo Go (iOS/Android) or press:
+- `i` for iOS simulator
+- `a` for Android emulator
+- `w` for web browser
+
+### 4. Connect frontend to backend
+
+The frontend API client (`frontend/src/services/api.js`) is configured to connect to:
+- **iOS Simulator**: `http://localhost:5000/api`
+- **Android Emulator**: `http://10.0.2.2:5000/api`
+
+If testing on a physical device, update the `getBaseUrl()` function in `api.js` with your machine's local IP address:
+
+```js
+const getBaseUrl = () => {
+  return 'http://YOUR_LOCAL_IP:5000/api';
+};
+```
+
+## How Splitting Works
+
+### Equal Split
+Total divided equally among selected members.  
+Example: $120 among 4 people = $30 each.
+
+### Exact Amount
+Specify exact amounts per person. Must sum to the total.  
+Example: $100 total - Alice $60, Bob $40.
+
+### Percentage
+Specify percentage per person. Must sum to 100%.  
+Example: $200 total - Alice 60% ($120), Bob 40% ($80).
+
+### Shares
+Specify share units per person. Amount is divided proportionally.  
+Example: $150 total, Alice 2 shares, Bob 1 share - Alice $100, Bob $50.
+
+### Debt Simplification
+When enabled on a group, the app minimizes the number of transactions needed.  
+Example: If A owes B $10 and B owes C $10, it simplifies to A owes C $10 (1 transaction instead of 2).
+
+## Troubleshooting
+
+**MongoDB connection errors**
+- Ensure MongoDB is running: `mongod` or check Atlas dashboard
+- Verify the `MONGODB_URI` in `backend/.env`
+
+**API connection from mobile device**
+- Use your machine's IP (not localhost) in `api.js`
+- Ensure your phone and computer are on the same Wi-Fi network
+- Check that port 5000 isn't blocked by firewall
+
+**Expo errors**
+- Clear cache: `npx expo start -c`
+- Reinstall dependencies: `rm -rf node_modules && npm install`
+
+**Auth issues**
+- Check that the JWT_SECRET is set in `.env`
+- Verify the token is being stored in AsyncStorage
+
+## License
 
 This project is private and proprietary.
-
-## 👤 Author
-
-Created with ❤️ for easy expense splitting and bill management.
-
-## 🙏 Acknowledgments
-
-- Built with [Expo](https://expo.dev/)
-- UI components from [React Native Paper](https://reactnativepaper.com/)
-- Backend powered by [Firebase](https://firebase.google.com/)
-- Navigation handled by [React Navigation](https://reactnavigation.org/)
-
----
-
-**Note**: Make sure to keep your Firebase configuration secure and never commit sensitive keys to public repositories. Consider using environment variables for production builds.

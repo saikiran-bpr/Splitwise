@@ -30,19 +30,15 @@ export default function SignupScreen({ navigation }) {
     try {
       await signup(email.trim(), password, name.trim() || undefined);
     } catch (err) {
-      let message = "Failed to create account. Please try again.";
-      if (err.code === "auth/email-already-in-use") message = "Email already in use.";
-      else if (err.code === "auth/invalid-email") message = "Invalid email.";
-      else if (err.code === "auth/weak-password") message = "Weak password.";
-      Alert.alert("Signup Error", message);
+      Alert.alert("Signup Error", err.message || "Failed to create account. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.content}>
@@ -116,16 +112,16 @@ export default function SignupScreen({ navigation }) {
             />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleSignup} 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleSignup}
             disabled={loading}
           >
             <Icon source="account-plus" size={20} color="#FFFFFF" />
             <Text style={styles.buttonText}>{loading ? "Creating..." : "Create Account"}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.linkContainer}
             onPress={() => navigation.navigate("Login")}
           >

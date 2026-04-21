@@ -1,22 +1,42 @@
 // src/screens/AddMemberToGroupScreen.js
-import React, { useState, useContext } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import React, { useState, useContext, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { DataContext } from "../context/DataContext";
 import { AuthContext } from "../context/AuthContext";
 import { Icon } from "react-native-paper";
 
 export default function AddMemberToGroupScreen({ route, navigation }) {
   const { groupId } = route.params;
-  const { friends, groups, addMemberToGroup } = useContext(DataContext);
+  const { friends, fetchFriends, getGroupDetail, addMemberToGroup } = useContext(DataContext);
   const { user } = useContext(AuthContext);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
+  const [group, setGroup] = useState(null);
 
-  const group = groups.find(g => g.id === groupId);
-  
-  // Filter out friends who are already in the group
-  const availableFriends = friends.filter(friend => 
-    !group?.members?.includes(friend.id)
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [_, groupData] = await Promise.all([
+        fetchFriends(),
+        getGroupDetail(groupId),
+      ]);
+      setGroup(groupData.group);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      Alert.alert("Error", "Failed to load data.");
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  // Filter out friends already in group
+  const existingMemberIds = (group?.members || []).map(m => m.user?._id || m.user);
+  const availableFriends = friends.filter(friend =>
+    !existingMemberIds.includes(friend._id)
   );
 
   const toggleFriend = (friendId) => {
@@ -49,25 +69,27 @@ export default function AddMemberToGroupScreen({ route, navigation }) {
 
   const getAvatarColor = (name) => {
     const colors = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
-    const index = name.charCodeAt(0) % colors.length;
+    const index = (name || "U").charCodeAt(0) % colors.length;
     return colors[index];
   };
 
   const renderFriend = ({ item }) => {
-    const isSelected = selectedFriends.includes(item.id);
-    const avatarColor = getAvatarColor(item.name);
-    
+    const isSelected = selectedFriends.includes(item._id);
+    const avatarColor = getAvatarColor(item.name || item.email);
+
     return (
       <TouchableOpacity
         style={[styles.friendItem, isSelected && styles.friendItemSelected]}
-        onPress={() => toggleFriend(item.id)}
+        onPress={() => toggleFriend(item._id)}
       >
         <View style={styles.friendContent}>
           <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
             {isSelected && <Text style={styles.checkmark}>✓</Text>}
           </View>
           <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>
+              {(item.name || item.email).charAt(0).toUpperCase()}
+            </Text>
           </View>
           <View style={styles.friendInfo}>
             <Text style={styles.friendName}>{item.name}</Text>
@@ -78,10 +100,19 @@ export default function AddMemberToGroupScreen({ route, navigation }) {
     );
   };
 
+  if (loadingData) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6366F1" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
   if (!group) {
     return (
-      <View style={styles.container}>
-        <Text>Group not found</Text>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>Group not found</Text>
       </View>
     );
   }
@@ -113,7 +144,7 @@ export default function AddMemberToGroupScreen({ route, navigation }) {
               <Icon source="account-multiple-outline" size={48} color="#9CA3AF" />
               <Text style={styles.emptyText}>No friends available</Text>
               <Text style={styles.emptySubtext}>
-                {friends.length === 0 
+                {friends.length === 0
                   ? "Add friends first to add them to the group"
                   : "All your friends are already in this group"}
               </Text>
@@ -121,7 +152,7 @@ export default function AddMemberToGroupScreen({ route, navigation }) {
           ) : (
             <FlatList
               data={availableFriends}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item._id}
               renderItem={renderFriend}
               style={styles.friendsList}
               contentContainerStyle={styles.friendsListContent}
@@ -151,6 +182,21 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#6C757D",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#EF4444",
   },
   header: {
     backgroundColor: "#FFFFFF",
@@ -300,4 +346,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
