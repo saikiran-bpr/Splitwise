@@ -1,4 +1,4 @@
-# Splitwise Clone
+# Splitwise
 
 A full-stack expense splitting application built with React Native (Expo) and Node.js. Track shared expenses, split bills with multiple methods, simplify debts, and settle up with friends.
 
